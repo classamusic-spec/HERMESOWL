@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Vercel
+.vercel/
+
+# macOS
+.DS_Store
