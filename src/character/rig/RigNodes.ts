@@ -7,7 +7,9 @@
 export const RIG_NODE_KEYS = [
   'owlet-root',
   'halo-group',
+  'halo-ring',
   'halo',
+  'halo-back',
   'halo-bloom',
   'halo-spark',
   'head-root',
@@ -16,6 +18,7 @@ export const RIG_NODE_KEYS = [
   'right-wing',
   'head-base',
   'face-mask',
+  'face-layer',
   'forehead-star-group',
   'forehead-star',
   'forehead-star-bloom',

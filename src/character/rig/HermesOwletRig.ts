@@ -24,7 +24,7 @@ import {
   type PhaseTarget,
 } from '../state/phaseTargets';
 import { ANCHORS, GOLD_RAMP, LID_TRAVEL } from '../svg/geometry';
-import { DomWriter, rotateAbout, translate } from './DomWriter';
+import { DomWriter, rotateAbout, scaleAbout, translate } from './DomWriter';
 import type { RigNodes } from './RigNodes';
 
 export interface RigOptions {
@@ -390,7 +390,10 @@ export class HermesOwletRig {
       upperClose,
       lowerClose,
       eyeScaleX,
-      eyeScaleY,
+      // The lids press the eye a little flatter as they close.
+      eyeScaleY: eyeScaleY * (1 - blink * 0.05),
+      blink,
+      stretch: this.idle.stretch,
       beakDrop,
       micro,
     });
@@ -428,16 +431,28 @@ export class HermesOwletRig {
     lowerClose: number;
     eyeScaleX: number;
     eyeScaleY: number;
+    blink: number;
+    stretch: number;
     beakDrop: number;
     micro: { starFlash: number; sparkFlash: number; wakeProgress: number };
   }): void {
     const w = this.writer;
     const halo = ANCHORS.halo;
 
+    // Volume-preserving squash and stretch, pivoted at the base of the skull so
+    // the head settles onto its own weight rather than scaling from the middle.
+    const sy = 1 + f.stretch;
+    const sx = 1 - f.stretch * 0.55;
     w.transform(
       'head-root',
-      `${translate(0, f.headY)} ${rotateAbout(f.headTilt, ANCHORS.headPivot.x, ANCHORS.headPivot.y)}`,
+      `${translate(0, f.headY)} ` +
+        `${rotateAbout(f.headTilt, ANCHORS.headPivot.x, ANCHORS.headPivot.y)} ` +
+        `${scaleAbout(sx, sy, 256, 452)}`,
     );
+
+    // 2.5D: the face rides a fraction of the tilt, so it leads the form it is
+    // painted on instead of being welded flat to it.
+    w.transform('face-layer', translate(f.headTilt * 0.6, f.headY * 0.06));
     w.transform(
       'crown-tuft',
       rotateAbout(this.idle.tuftAngle, ANCHORS.tuftPivot.x, ANCHORS.tuftPivot.y),
@@ -461,6 +476,10 @@ export class HermesOwletRig {
     // Brightness steps along the flat gold ramp; the soft bloom only joins in
     // at the top of the range, so the halo is never permanently hazy.
     w.attr('halo', 'stroke', goldStep(this.halo.glow));
+    // The far half of the ring stays a couple of steps down the ramp; that gap
+    // is what reads as depth.
+    w.attr('halo-back', 'stroke', goldStep(this.halo.glow * 0.5));
+    w.transform('halo-ring', scaleAbout(1, this.halo.perspective, halo.cx, halo.cy));
     w.opacity('halo-bloom', Math.max(0, this.halo.glow - 0.72) * 1.15 * haloOpacity);
 
     const sparkAngle = (this.halo.rotation * Math.PI) / 180;
@@ -491,7 +510,8 @@ export class HermesOwletRig {
     w.transform('left-eye', eyeTransform(ANCHORS.leftEye.x, ANCHORS.leftEye.y));
     w.transform('right-eye', eyeTransform(ANCHORS.rightEye.x, ANCHORS.rightEye.y));
 
-    const pupil = translate(f.gazePx.x, f.gazePx.y);
+    // The eye rolls down a touch under a closing lid, the way a real one does.
+    const pupil = translate(f.gazePx.x, f.gazePx.y + f.blink * 3);
     w.transform('left-pupil', pupil);
     w.transform('right-pupil', pupil);
 

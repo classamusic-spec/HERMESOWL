@@ -39,6 +39,8 @@ export class IdleController {
   microTilt = 0;
   /** Crest follow-through, in degrees. */
   tuftAngle = 0;
+  /** Squash and stretch on the breath: positive stretches the head taller. */
+  stretch = 0;
 
   private floatPhase = 0;
   private floatPeriod = 4.2;
@@ -51,6 +53,7 @@ export class IdleController {
     if (opts.reducedMotion || opts.amplitude <= 0) {
       this.floatY = 0;
       this.microTilt = 0;
+      this.stretch = 0;
       this.tuftAngle *= Math.pow(0.02, dt);
       return;
     }
@@ -72,6 +75,10 @@ export class IdleController {
     this.tuftVelocity += (velocity * 0.06 - this.tuftVelocity) * Math.min(1, dt * 9);
     this.tuftAngle = Math.max(-2, Math.min(2, -this.tuftVelocity));
 
+    // Rising on the breath stretches the head a fraction; bottoming out squashes
+    // it. Under a percent either way — felt rather than seen.
+    this.stretch = Math.max(-0.007, Math.min(0.007, -this.tuftVelocity * 0.05));
+
     // Random idle behaviour, one at a time.
     this.nextMicroIn -= dt;
     if (this.nextMicroIn <= 0) {
@@ -85,6 +92,7 @@ export class IdleController {
   reset(): void {
     this.floatY = 0;
     this.microTilt = 0;
+    this.stretch = 0;
     this.tuftAngle = 0;
     this.tuftVelocity = 0;
     this.lastFloatY = 0;

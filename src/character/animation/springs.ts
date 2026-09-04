@@ -46,8 +46,9 @@ export const snapSpring = (s: Spring, value: number): void => {
 };
 
 export const SPRING_PRESETS = {
-  /** Pupils: soft, never overshoots, never snaps. */
-  gaze: { stiffness: 11, damping: 1.25 },
+  /** Pupils. Real eyes dart and settle rather than drift, so this is quick
+   *  with only a whisper of overshoot — alive, but never a snap. */
+  gaze: { stiffness: 18, damping: 1.02 },
   /** Head float and tilt: slow and weighty. */
   head: { stiffness: 7, damping: 1.15 },
   /** Reactions that must be felt immediately (interrupt recoil). */

@@ -36,6 +36,9 @@ export class HaloController implements HaloControllerApi {
   /** Spark presentation. */
   sparkScale = 1;
   sparkOpacity = 0.75;
+  /** Vertical scale of the ring. Breathing it swings the ring's apparent tilt,
+   *  which is what makes two flat arcs read as a ring in space. */
+  perspective = 1;
 
   private rockPhase = 0;
   private sparkPulse = 0;
@@ -53,6 +56,8 @@ export class HaloController implements HaloControllerApi {
     this.rockPhase += dt;
     const rock = opts.reducedMotion ? 0 : Math.sin(this.rockPhase * 0.42) * 1.6;
     this.tilt = damp(this.tilt, opts.tilt, 0.002, dt) + rock;
+
+    this.perspective = opts.reducedMotion ? 1 : 1 + Math.sin(this.rockPhase * 0.31) * 0.07;
 
     if (opts.reducedMotion) {
       // Hold the spark still: reduced motion keeps state changes, not idle life.

@@ -50,6 +50,73 @@ export const GOLD_RAMP = [
   '#FFDE8C',
 ] as const;
 
+/**
+ * Premium shading pass.
+ *
+ * The character stays flat-coloured and outlined — no textures, no rendered
+ * lighting. Form comes from three restrained devices: a single subtle radial or
+ * linear gradient per major shape, a contact-occlusion band where one layer
+ * overhangs another, and one rim light. Every intensity lives here, so the whole
+ * pass dials down to nothing by zeroing these numbers.
+ *
+ * One light, from the upper right. It is already implied by the locked art —
+ * the eye highlight sits upper-right and the cyan crescent lower-left — so every
+ * shadow added here falls to the lower left to agree with it.
+ */
+export const SHADING = {
+  /** Inner occlusion band where the navy head overhangs the cream mask. */
+  faceOcclusion: 0.07,
+  /** Shadow the crest drops onto the skull. */
+  tuftContact: 0.13,
+  /** Shadow the beak drops onto the mask. */
+  beakContact: 0.085,
+  /** Rim light along the upper-right shoulder of the head. */
+  headRim: 0.22,
+  /** Lid shadow across the top of each eye. */
+  eyeLid: 0.085,
+  /** Bounce highlight opposite the specular. */
+  eyeBounce: 0.55,
+  /** Specular arc on the headphone rings. */
+  cupSpecular: 0.38,
+} as const;
+
+/**
+ * Two-stop paint ramps. Each is a small value shift around the locked token —
+ * enough to give a shape volume, never enough to read as a gradient.
+ */
+export const PAINT = {
+  headLit: '#1C2C68',
+  headShade: '#14204F',
+  headRim: '#3D58A6',
+  faceLit: '#FFFDF6',
+  faceShade: '#F6EEDD',
+  creamLit: '#FFFDF6',
+  creamShade: '#F2E8D2',
+  irisTop: '#1B87D4',
+  irisBottom: '#4FBEFF',
+  pupilCore: '#0C1538',
+  pupilBounce: '#22357A',
+  beakLit: '#FFCF63',
+  beakShade: '#E9A930',
+  goldLit: '#FFD570',
+  goldShade: '#E09E22',
+  cyanLit: '#5CC7FF',
+  cyanShade: '#1B8ED4',
+} as const;
+
+/**
+ * The halo is drawn as two arcs rather than one ellipse: the far half in a
+ * darker gold, the near half in the lit gold. That single split is what makes a
+ * flat ellipse read as a ring seen in perspective.
+ */
+export const HALO_ARCS = {
+  back: 'M 158 111 A 96 26 0 0 1 350 111',
+  front: 'M 350 111 A 96 26 0 0 1 158 111',
+} as const;
+
+/** Rim-light arc along the head's upper-right shoulder. */
+export const HEAD_RIM_PATH = 'M 296 171 C 344 180 386 212 398 262';
+
 /** Stroke weights, in user units. The heavy navy outline is part of the design. */
 export const STROKE = {
   silhouette: 7,
@@ -81,6 +148,9 @@ export const ANCHORS = {
     coreOffset: { x: 11, y: -13 },
     highlightOffset: { x: 16, y: -18 },
     highlightRadius: 8,
+    /** Bounce light, opposite the specular. Reads as a second light source. */
+    bounceOffset: { x: 2, y: 17 },
+    bounceRadius: 4,
     maxGazeX: 7,
     maxGazeY: 5,
   },
@@ -140,6 +210,9 @@ export const PATHS = {
   /** Lids, in eye-local coordinates. Their leading edge carries the navy line. */
   upperLid: 'M -74 -104 L 74 -104 L 74 -12 C 46 6 -46 6 -74 -12 Z',
   lowerLid: 'M -74 104 L 74 104 L 74 12 C 46 -6 -46 -6 -74 12 Z',
+
+  /** Lid shadow across the top of the eye, in eye-local coordinates. */
+  eyeLidShade: 'M -60 -62 L 60 -62 L 60 -44 C 34 -10 -34 -10 -60 -44 Z',
 
   /** Brow, in eye-local coordinates. Hidden at neutral so the silhouette holds. */
   brow: 'M -30 0 C -14 -9 14 -9 30 0',

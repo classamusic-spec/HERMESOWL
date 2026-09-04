@@ -73,22 +73,29 @@ a lower-priority phase also has to wait out a 200 ms dwell before it can take ov
 
 ```
 HermesOwlet
-├── halo-group ─ halo-bloom · halo · halo-spark
-└── head-root
+├── halo-group
+│   ├── halo-ring ─ halo-bloom · halo-back (far half) · halo (near half)
+│   └── halo-spark
+└── head-root                                   (float · tilt · squash/stretch)
     ├── crown-tuft
-    ├── ear-wings-back ─ left-wing · right-wing        (3 cream feathers + 2 gold accents)
+    ├── ear-wings-back ─ left-wing · right-wing (3 cream feathers + 2 gold accents)
     ├── head-base
+    ├── tuft-shadow                             (clipped to the head)
+    ├── head-rim
     ├── face-mask
+    ├── face-occlusion                          (clipped to the mask)
     ├── effects ─ error-pulse · listening-glow · speaking-pulse · thinking-spark
-    ├── forehead-star-group ─ forehead-star-bloom · forehead-star
-    ├── eyes ─ {left,right}-eye
-    │            └ sclera · {side}-pupil (iris · {side}-pupil-core · highlight)
-    │              · {side}-lid · {side}-lower-lid
-    ├── brows ─ left-brow · right-brow                 (invisible at neutral)
-    ├── beak ─ beak-gap · upper-beak · lower-beak
+    ├── face-layer                              (2.5D parallax plane)
+    │   ├── forehead-star-group ─ forehead-star-bloom · forehead-star
+    │   ├── eyes ─ {left,right}-eye
+    │   │            └ sclera · {side}-pupil (iris · {side}-pupil-core
+    │   │              · highlight · bounce) · {side}-eye-shade
+    │   │              · {side}-lid · {side}-lower-lid
+    │   ├── brows ─ left-brow · right-brow       (invisible at neutral)
+    │   └── beak ─ beak-shadow · beak-gap · upper-beak · lower-beak
     └── headphones ─ {side}-headphone
                        └ {side}-headphone-glow · gold ring · cyan ring
-                         · {side}-headphone-lit · inner disc
+                         · {side}-headphone-lit · inner disc · specular
 ```
 
 Every feature carries both a stable `id` (`#head-root`, `#left-eye`, `#beak` …) and a
@@ -113,6 +120,48 @@ Owlets can share a page without their ids colliding.
 Expressions (`neutral`, `happy`, `curious`, `focused`, `concerned`, `surprised`) modify the
 same layers on top of the phase pose. Brows are fully transparent at neutral, so the
 approved silhouette is untouched unless an expression asks for them.
+
+## The polish pass
+
+The character is lit by **one key light from the upper right** — a direction the
+locked art already implies, with its upper-right eye specular and lower-left cyan
+crescent. Everything below agrees with it. There are no filters and no blurs
+anywhere, so the head still composites for free.
+
+**Form.** One two-stop ramp per major shape — head, face mask, wings, iris, pupil,
+beak, gold, cyan. Each is a small value shift around the locked token: enough to
+give the shape volume, never enough to read as a gradient. The beak's ramp is
+`userSpaceOnUse` and spans both halves, because an object-box ramp restarts on
+each half and puts a value step straight back across the seam.
+
+**Contact.** The crest drops a shadow onto the skull (its own path, offset and
+clipped to the head), the beak drops one onto the mask, and the mask carries an
+inner occlusion band where the navy overhangs it. Without these the features read
+as decals sitting on top of the head rather than parts of it.
+
+**Eyes.** A lid shadow across the top of the sclera, a bounce light on the pupil
+opposite the specular, and a rim on the cyan. Two lights is what makes an eye read
+as glass instead of a flat disc — and the eyes are where all the appeal lives.
+
+**The halo is two arcs, not an ellipse.** The far half sits a couple of steps down
+the gold ramp from the near half, and the rig breathes the ring's vertical scale.
+That single split is what turns a flat ellipse into a ring seen in perspective.
+
+Every intensity lives in `SHADING` in `geometry.ts`. Zero those numbers and the
+whole pass collapses back to flat, with the silhouette and colour identity
+untouched.
+
+### Motion craft
+
+- **Squash and stretch.** Rising on the breath stretches the head a fraction;
+  bottoming out squashes it. Volume-preserving, pivoted at the base of the skull,
+  under a percent either way — felt rather than seen.
+- **2.5D parallax.** The face rides a fraction of the head tilt, so the features
+  lead the form they are painted on instead of being welded flat to it.
+- **Saccades.** Real eyes dart and settle rather than drift. The gaze spring is
+  quick with a whisper of overshoot — full travel in ~300 ms, and never a snap.
+- **Blink weight.** The lids press the eye about 5 % flatter as they close, and
+  the pupil rolls down with them, the way a real one does.
 
 ## Notes
 
@@ -141,8 +190,11 @@ Chromium 131, production build, `speaking` (the busiest phase, beak + head bob +
 gaze + halo + cup pulse all live):
 
 ```
-frame time   median 16.70 ms   p95 16.70 ms   max 16.80 ms      → a locked 60 fps
+frame time   median 16.70 ms   p95 16.80 ms   max 16.80 ms      → a locked 60 fps
 ```
+
+The shading pass costs nothing measurable: gradients are paint servers, not
+filters, and the frame budget is identical before and after it.
 
 Verified in the browser rather than asserted: the head floats and the spark orbits over time,
 `Blink` moves the lid from `translate(0 -104)` to `translate(0 11.35)`, the beak reaches 24
@@ -162,7 +214,13 @@ can be reconciled without rediscovering them.
 
 ## Where the art lives
 
-`src/character/svg/geometry.ts` is the single source of truth. `npm run export:svg` renders
-the standalone asset from it to `../Art/hermes-owlet/hermes-owlet.svg` (and to `public/` for
-the favicon), so the file on disk can never drift from the component. Do not hand-edit the
-exported SVG.
+`src/character/svg/geometry.ts` holds the locked art data; `HermesOwletSVG.tsx` is the
+one description of how it is assembled.
+
+`npm run export:svg` renders **that actual component** through `react-dom/server` and
+writes the result to `reference/hermes-owlet-animated.svg` and `public/hermes-owlet.svg`.
+It does not re-template the markup — an exporter that duplicates the SVG is one that goes
+stale the first time the art changes. Do not hand-edit the exported files.
+
+`owl.svg` and `reference/owl-source.svg` are the original approved art, preserved
+untouched.
