@@ -7,10 +7,12 @@ export type { RigNodeKey, RigNodes } from './rig/RigNodes';
 export {
   HERMES_COLORS,
   ANCHORS,
-  PATHS,
   VIEW_BOX,
   BEAK_MAX_DROP,
+  GOLD_RAMP,
 } from './svg/geometry';
+export { SOURCE_ART } from './svg/sourceArt';
+export type { ArtPath } from './svg/sourceArt';
 export {
   BEAK_SHAPES,
   beakShapeForLevel,

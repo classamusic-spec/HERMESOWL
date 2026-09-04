@@ -28,7 +28,11 @@ import { HermesBridge, hermesEvents } from './bridge/HermesBridge';
 const bridge = new HermesBridge();
 const owl = useRef<HermesOwletHandle>(null);
 
+// The head on its own …
 <HermesOwlet ref={owl} bridge={bridge} size={128} />;
+
+// … or the head in its world.
+<HermesOwletStage ref={owl} bridge={bridge} scale={0.52} />;
 
 bridge.send(hermesEvents.connected());       // → waking → idle
 bridge.send(hermesEvents.listeningStarted()); // → listening
@@ -46,16 +50,24 @@ Without a bridge, drive it directly: `<HermesOwlet phase="thinking" emotion="foc
 src/
   character/
     HermesOwlet.tsx              React surface: phase, emotion, imperative handle
-    svg/geometry.ts              LOCKED art data — paths, anchors, colour tokens
-    svg/HermesOwletSVG.tsx       layered SVG, one stable id per animated feature
+    svg/sourceArt.ts             GENERATED — owl.svg's paths, verbatim
+    svg/geometry.ts              anchors, palette, lids/brows/mouth
+    svg/HermesOwletSVG.tsx       assembles the source paths into moving layers
     state/                       phase enum, priority, machine, phase poses, expressions
     controllers/                 eye, blink, gaze, beak, halo, headphone, wing, idle, micro
     animation/                   easing, springs, one-shot timelines, seeded RNG
     rig/                         rAF engine, node map, dirty-checked DOM writer
-  audio/SpeechMeter.ts           TTS amplitude → 0..1, fast attack / slow release
-  bridge/HermesBridge.ts         normalised Hermes events → phase
+  world/
+    HermesOwletStage.tsx         the companion window: owl + sky
+    WorldScene.tsx               canvas host; parallax, visibility, resize
+    WorldRenderer.ts             the night sky engine
+    worldTheme.ts                a mood per phase, plus the constellation
+  audio/SpeechMeter.ts           TTS amplitude -> 0..1, fast attack / slow release
+  bridge/HermesBridge.ts         normalised Hermes events -> phase
   simulator/CharacterSimulator.tsx
-scripts/export-static-svg.ts     emits the standalone asset from the same geometry
+scripts/
+  trace-art.mjs                  owl.svg -> sourceArt.ts
+  export-static-svg.tsx          renders the real component to a standalone asset
 ```
 
 **React never animates.** It holds the phase and the emotion; that is all. Every animated
@@ -72,30 +84,27 @@ a lower-priority phase also has to wait out a 200 ms dwell before it can take ov
 ## Layers
 
 ```
-HermesOwlet
-├── halo-group
-│   ├── halo-ring ─ halo-bloom · halo-back (far half) · halo (near half)
-│   └── halo-spark
-└── head-root                                   (float · tilt · squash/stretch)
-    ├── crown-tuft
-    ├── ear-wings-back ─ left-wing · right-wing (3 cream feathers + 2 gold accents)
-    ├── head-base
-    ├── tuft-shadow                             (clipped to the head)
-    ├── head-rim
-    ├── face-mask
-    ├── face-occlusion                          (clipped to the mask)
-    ├── effects ─ error-pulse · listening-glow · speaking-pulse · thinking-spark
-    ├── face-layer                              (2.5D parallax plane)
-    │   ├── forehead-star-group ─ forehead-star-bloom · forehead-star
-    │   ├── eyes ─ {left,right}-eye
-    │   │            └ sclera · {side}-pupil (iris · {side}-pupil-core
-    │   │              · highlight · bounce) · {side}-eye-shade
-    │   │              · {side}-lid · {side}-lower-lid
-    │   ├── brows ─ left-brow · right-brow       (invisible at neutral)
-    │   └── beak ─ beak-shadow · beak-gap · upper-beak · lower-beak
-    └── headphones ─ {side}-headphone
-                       └ {side}-headphone-glow · gold ring · cyan ring
-                         · {side}-headphone-lit · inner disc · specular
+HermesOwletStage
+├── WorldScene                                   (canvas: sky, aurora, stars,
+│                                                 constellation, motes, ripples)
+└── HermesOwlet
+    ├── halo-group ─ halo-ring (halo-bloom · halo) · halo-spark
+    └── head-root                                (float · tilt · squash/stretch)
+        ├── left-wing · right-wing
+        ├── head-chin
+        ├── face-mask
+        ├── left-sclera · right-sclera           (under the navy hood: the brow)
+        ├── crown-tuft                           (head mass + crest detail)
+        ├── head-sides
+        ├── effects ─ listening-glow · speaking-pulse · thinking-spark
+        │             · error-pulse
+        ├── face-layer                           (2.5D parallax plane)
+        │   ├── forehead-star-group ─ forehead-star-bloom · forehead-star
+        │   ├── eyes ─ {left,right}-eye
+        │   │            └ {side}-pupil · {side}-lid · {side}-lower-lid
+        │   ├── brows ─ left-brow · right-brow    (invisible at neutral)
+        │   └── beak ─ beak-gap · upper-beak · lower-beak
+        └── headphones ─ {side}-headphone · {side}-headphone-lit
 ```
 
 Every feature carries both a stable `id` (`#head-root`, `#left-eye`, `#beak` …) and a
@@ -121,47 +130,76 @@ Expressions (`neutral`, `happy`, `curious`, `focused`, `concerned`, `surprised`)
 same layers on top of the phase pose. Brows are fully transparent at neutral, so the
 approved silhouette is untouched unless an expression asks for them.
 
-## The polish pass
+## The art is the source, not a copy of it
 
-The character is lit by **one key light from the upper right** — a direction the
-locked art already implies, with its upper-right eye specular and lower-left cyan
-crescent. Everything below agrees with it. There are no filters and no blurs
-anywhere, so the head still composites for free.
+`owl.svg` in this repository is the approved character. Rather than re-draw it,
+`npm run trace:art` lifts all 50 of its paths **verbatim** into
+`src/character/svg/sourceArt.ts`, grouped — and only grouped — into the layers
+the rig needs to move. The component renders them in the source's own coordinate
+space (156 x 144, windowed to a square view box), so nothing is rescaled and
+nothing is approximated.
 
-**Form.** One two-stop ramp per major shape — head, face mask, wings, iris, pupil,
-beak, gold, cyan. Each is a small value shift around the locked token: enough to
-give the shape volume, never enough to read as a gradient. The beak's ramp is
-`userSpaceOnUse` and spans both halves, because an object-box ramp restarts on
-each half and puts a value step straight back across the seam.
+That is the whole reason the head is identical to the source: it *is* the
+source. Every colour, curve and facet — the two-tone face shading, the four
+faceted planes of the beak, the ear cups and their gold band, the feathered
+wings — comes from the original file, not from a trace of a screenshot.
 
-**Contact.** The crest drops a shadow onto the skull (its own path, offset and
-clipped to the head), the beak drops one onto the mask, and the mask carries an
-inner occlusion band where the navy overhangs it. Without these the features read
-as decals sitting on top of the head rather than parts of it.
+The rig adds only what a single static pose cannot contain: eyelids, brows, and
+the inside of the beak.
 
-**Eyes.** A lid shadow across the top of the sclera, a bounce light on the pupil
-opposite the specular, and a rim on the cyan. Two lights is what makes an eye read
-as glass instead of a flat disc — and the eyes are where all the appeal lives.
+## The talking animation
 
-**The halo is two arcs, not an ellipse.** The far half sits a couple of steps down
-the gold ramp from the near half, and the rig breathes the ring's vertical scale.
-That single split is what turns a flat ellipse into a ring seen in perspective.
+Speech has to be legible at 64 px, not just at 512, so the beak gets real
+articulation rather than a hint of one.
 
-Every intensity lives in `SHADING` in `geometry.ts`. Zero those numbers and the
-whole pass collapses back to flat, with the silhouette and colour identity
-untouched.
+The two mandibles are the **same source paths under two clip rectangles**, split
+at the widest point of the diamond. Shut, they reassemble into the approved beak
+exactly — no seam, no value step, nothing to give the trick away. Open, they part
+with clean mandible edges, because a clipped path cuts flat where a real beak
+hinges.
 
-### Motion craft
+Behind them sits a static, tapering lens in the darkest navy of the palette,
+spanning the full possible opening. The mandible *uncovers* it rather than
+stretching it, so the mouth is mouth-shaped at every amplitude instead of a
+widening bar. Full open is a quarter of the beak's height — well past subtle,
+still nowhere near a puppet.
 
-- **Squash and stretch.** Rising on the breath stretches the head a fraction;
-  bottoming out squashes it. Volume-preserving, pivoted at the base of the skull,
-  under a percent either way — felt rather than seen.
-- **2.5D parallax.** The face rides a fraction of the head tilt, so the features
-  lead the form they are painted on instead of being welded flat to it.
-- **Saccades.** Real eyes dart and settle rather than drift. The gaze spring is
-  quick with a whisper of overshoot — full travel in ~300 ms, and never a snap.
-- **Blink weight.** The lids press the eye about 5 % flatter as they close, and
-  the pupil rolls down with them, the way a real one does.
+Amplitude is smoothed with a fast attack and a slow release, quantised to the
+four locked shapes, then sprung, so syllables land crisply and trail off softly.
+Measured live: **29 distinct beak positions in 1.6 s of speech**.
+
+## The world
+
+The owl lives somewhere. `HermesOwletStage` composes the character with
+`WorldScene` — a night sky on a single canvas, reading the same phase the
+character does, so the room and its occupant are never out of step.
+
+| Layer | Behaviour |
+| --- | --- |
+| Sky | Three-stop gradient, blended between per-phase moods |
+| Aurora | Two enormous soft veils drifting at different rates |
+| Constellation | Draws itself in as the agent reasons; gone at idle |
+| Stars | 190 across depth layers, twinkling, parallaxed by depth |
+| Presence glow | A pool of light directly behind the head |
+| Ripples | Rings leaving the owl while it speaks, on the beat of the amplitude |
+| Motes | 46 drifting particles that lean toward the owl when it listens, and away when it speaks |
+| Vignette | Corner falloff, pushing the eye to the character |
+
+Moods per phase: idle is calm; **listening** brightens to cyan and the motes lean
+in; **thinking** goes violet and connects the constellation; **tool use** runs warm
+and fast; **speaking** pools gold and sheds rings; **success** blooms; **error**
+shifts to a muted rose and the constellation goes out; **offline** is nearly black.
+Phases blend rather than cut.
+
+The presence glow is not decoration. The character's navy is nearly the value of
+the night sky, so without a light behind it the silhouette dissolves and the owl
+reads as a floating face. Lighting it from behind keeps the head readable — and
+suits a character that already wears a halo.
+
+Performance: everything soft is drawn by stamping one pre-rendered radial
+sprite, tinted and cached by quantised colour, rather than building gradients per
+frame. The canvas stops entirely when the tab is hidden or the stage scrolls out
+of view.
 
 ## Notes
 
@@ -186,36 +224,37 @@ untouched.
 
 ## Measured
 
-Chromium 131, production build, `speaking` (the busiest phase, beak + head bob + blink +
-gaze + halo + cup pulse all live):
+Chromium, production build, **world and character both live**, in the `speaking`
+phase — the busiest thing this renders:
 
 ```
 frame time   median 16.70 ms   p95 16.80 ms   max 16.80 ms      → a locked 60 fps
 ```
 
-The shading pass costs nothing measurable: gradients are paint servers, not
-filters, and the frame budget is identical before and after it.
+Verified in the browser against the built page rather than asserted:
 
-Verified in the browser rather than asserted: the head floats and the spark orbits over time,
-`Blink` moves the lid from `translate(0 -104)` to `translate(0 11.35)`, the beak reaches 24
-distinct positions in 1.4 s of speech (max gap 10.1 of a possible 11), `INTERRUPTED` resets
-`lower-beak` to `translate(0 0)` within 90 ms, reduced motion freezes head, spark and wings
-while blink and beak keep working, and the scripted Hermes session walks
-`idle → listening → idle → thinking → tool_use → thinking → speaking → thinking → success → idle`.
+- 29 distinct beak positions in 1.6 s of speech; `INTERRUPTED` closes the beak
+  within 90 ms
+- squash and stretch, halo perspective, face parallax under tilt, a 298 ms gaze
+  settle and the blink squash all confirmed live
+- reduced motion freezes head, wings and spark while blink and beak keep working
+- the scripted Hermes session walks
+  `idle → listening → thinking → tool_use → speaking → success → idle`
+- no page errors in any state
 
 ## Source reference
 
 `reference/owl-source.svg` and `owl.svg` (repo root) are the original approved
 Hermes Owlet art, preserved unchanged. The animated character is traced from it.
-Known intentional differences in this V1 trace: the headphones are drawn as
-concentric gold/cyan rings rather than the source's solid cyan over-ear cups
-with a gold headband, and the head is a touch rounder. Both are noted so they
-can be reconciled without rediscovering them.
+The animated character is not a trace of it — it renders the source's own paths.
+See "The art is the source, not a copy of it" below.
 
 ## Where the art lives
 
-`src/character/svg/geometry.ts` holds the locked art data; `HermesOwletSVG.tsx` is the
-one description of how it is assembled.
+`owl.svg` is the character. `npm run trace:art` lifts its paths verbatim into
+`src/character/svg/sourceArt.ts`; `geometry.ts` holds only anchors, the palette and the
+few shapes a static pose cannot contain; `HermesOwletSVG.tsx` is the one description of
+how it is all assembled.
 
 `npm run export:svg` renders **that actual component** through `react-dom/server` and
 writes the result to `reference/hermes-owlet-animated.svg` and `public/hermes-owlet.svg`.
@@ -223,4 +262,4 @@ It does not re-template the markup — an exporter that duplicates the SVG is on
 stale the first time the art changes. Do not hand-edit the exported files.
 
 `owl.svg` and `reference/owl-source.svg` are the original approved art, preserved
-untouched.
+untouched — and now load-bearing rather than decorative.

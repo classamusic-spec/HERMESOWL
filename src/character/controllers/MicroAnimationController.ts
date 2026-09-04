@@ -133,7 +133,7 @@ export class MicroAnimationController {
       }
 
       case 'tinyNod': {
-        o.headY = Math.sin(t * Math.PI * 2) * 1.8;
+        o.headY = Math.sin(t * Math.PI * 2) * 0.6;
         o.headTilt = Math.sin(t * Math.PI * 2) * 0.6;
         break;
       }
@@ -156,7 +156,7 @@ export class MicroAnimationController {
 
       case 'wake': {
         o.wakeProgress = easeOutCubic(t);
-        o.headY = -2.5 * easeOutBack(t);
+        o.headY = -0.8 * easeOutBack(t);
         o.haloFlash = pulse(t) * 0.35;
         o.starFlash = clamp01(t * 1.6);
         o.eyeWiden = pulse(t) * 0.25;
@@ -165,14 +165,14 @@ export class MicroAnimationController {
 
       case 'sleep': {
         o.wakeProgress = 1 - easeOutCubic(t);
-        o.headY = 2 * easeOutCubic(t);
+        o.headY = 0.65 * easeOutCubic(t);
         break;
       }
 
       case 'successBounce': {
         const rise = easeOutBack(clamp01(t * 1.8));
         const settle = t > 0.55 ? easeOutCubic((t - 0.55) / 0.45) : 0;
-        o.headY = -4 * rise * (1 - settle);
+        o.headY = -1.3 * rise * (1 - settle);
         o.wingLift = 7 * rise * (1 - settle);
         o.haloFlash = pulse(t) * 0.45;
         o.starFlash = pulse(t);
@@ -183,7 +183,7 @@ export class MicroAnimationController {
       case 'interruptReaction': {
         const w = pulse(t);
         o.eyeWiden = w * 0.9;
-        o.headY = w * 2.4;
+        o.headY = w * 0.78;
         o.headTilt = -w * 2;
         break;
       }

@@ -9,7 +9,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --pretty false",
-    "export:svg": "esbuild scripts/export-static-svg.tsx --bundle --platform=node --format=cjs --outfile=node_modules/.cache/hermes-owlet-export.cjs --log-level=warning && node node_modules/.cache/hermes-owlet-export.cjs"
+    "export:svg": "esbuild scripts/export-static-svg.tsx --bundle --platform=node --format=cjs --outfile=node_modules/.cache/hermes-owlet-export.cjs --log-level=warning && node node_modules/.cache/hermes-owlet-export.cjs",
+    "trace:art": "node scripts/trace-art.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

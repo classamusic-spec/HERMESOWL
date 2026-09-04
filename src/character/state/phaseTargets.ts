@@ -4,7 +4,8 @@ import type { HermesEmotion, HermesOwletPhase } from './HermesOwletState';
 export type PulseMode = 'off' | 'gentle' | 'alternating' | 'voice';
 
 /**
- * The resting pose for each phase. The rig springs toward these; nothing here
+ * The resting pose for each phase. Distances are in the source art's own units
+ * (the head is ~98 wide), so they look small next to a pixel value. The rig springs toward these; nothing here
  * is applied instantly. Values are absolute, not deltas, except where noted.
  */
 export interface PhaseTarget {
@@ -48,7 +49,7 @@ export interface PhaseTarget {
 }
 
 const idle: PhaseTarget = {
-  headY: 0,
+  headY: 0.00,
   headTilt: 0,
   wingLift: 0,
   eyeScaleY: 1,
@@ -65,7 +66,7 @@ const idle: PhaseTarget = {
   haloOrbitPeriod: 15,
   starGlow: 0.5,
   starPulsePeriod: 0,
-  floatAmplitude: 2,
+  floatAmplitude: 0.63,
   autonomous: true,
   emotion: 'neutral',
 };
@@ -75,7 +76,7 @@ export const PHASE_TARGETS: Record<HermesOwletPhase, PhaseTarget> = {
 
   listening: {
     ...idle,
-    headY: -2,
+    headY: -0.63,
     wingLift: 5,
     eyeScaleY: 1.04,
     gazeBiasX: 0,
@@ -124,7 +125,7 @@ export const PHASE_TARGETS: Record<HermesOwletPhase, PhaseTarget> = {
 
   speaking: {
     ...idle,
-    headY: -1,
+    headY: -0.31,
     wingLift: 2,
     headphoneGlow: 0.74,
     pulse: 'voice',
@@ -136,7 +137,7 @@ export const PHASE_TARGETS: Record<HermesOwletPhase, PhaseTarget> = {
 
   success: {
     ...idle,
-    headY: -3,
+    headY: -0.94,
     wingLift: 7,
     eyeScaleY: 0.96,
     headphoneGlow: 0.92,
@@ -149,7 +150,7 @@ export const PHASE_TARGETS: Record<HermesOwletPhase, PhaseTarget> = {
 
   interrupted: {
     ...idle,
-    headY: 2,
+    headY: 0.63,
     headTilt: -2,
     wingLift: 3,
     eyeScaleY: 1.08,
@@ -163,7 +164,7 @@ export const PHASE_TARGETS: Record<HermesOwletPhase, PhaseTarget> = {
 
   error: {
     ...idle,
-    headY: 2,
+    headY: 0.63,
     headTilt: -1.5,
     wingLift: -2,
     eyeScaleY: 0.94,
@@ -181,7 +182,7 @@ export const PHASE_TARGETS: Record<HermesOwletPhase, PhaseTarget> = {
 
   offline: {
     ...idle,
-    headY: 3,
+    headY: 0.94,
     headTilt: 0,
     wingLift: -3,
     lidNarrow: 0.85,
@@ -191,14 +192,14 @@ export const PHASE_TARGETS: Record<HermesOwletPhase, PhaseTarget> = {
     haloOpacity: 0.3,
     haloOrbitPeriod: 30,
     starGlow: 0.06,
-    floatAmplitude: 1.2,
+    floatAmplitude: 0.38,
     autonomous: false,
     emotion: 'neutral',
   },
 
   waking: {
     ...idle,
-    headY: -1,
+    headY: -0.31,
     headphoneGlow: 0.5,
     haloGlow: 0.5,
     haloOpacity: 1,

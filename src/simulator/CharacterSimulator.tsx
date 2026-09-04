@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HermesOwlet, type HermesOwletHandle } from '../character/HermesOwlet';
+import { HermesOwletStage } from '../world/HermesOwletStage';
 import type { MicroAnimation } from '../character/controllers/MicroAnimationController';
 import {
   PHASE_LABELS,
@@ -72,6 +73,7 @@ export function CharacterSimulator(): JSX.Element {
   const [dark, setDark] = useState(true);
   const [reduced, setReduced] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [world, setWorld] = useState(true);
 
   const [speech, setSpeech] = useState(0);
   const [autoSpeech, setAutoSpeech] = useState(true);
@@ -186,15 +188,31 @@ export function CharacterSimulator(): JSX.Element {
 
       <main className="sim__body">
         <section className="sim__stage">
-          <div className="sim__owl" style={{ width: size, height: size }}>
-            <HermesOwlet
-              ref={owlRef}
-              phase={phase}
-              bridge={useBridge ? bridge : undefined}
-              emotion={emotion === 'auto' ? null : emotion}
-              reducedMotion={reduced || 'auto'}
-              onState={setSnapshot}
-            />
+          <div
+            className={`sim__owl ${world ? 'sim__owl--world' : ''}`}
+            style={{ width: world ? Math.round(size * 1.9) : size, height: size }}
+          >
+            {world ? (
+              <HermesOwletStage
+                ref={owlRef}
+                phase={phase}
+                bridge={useBridge ? bridge : undefined}
+                emotion={emotion === 'auto' ? null : emotion}
+                reducedMotion={reduced || 'auto'}
+                onState={setSnapshot}
+                scale={0.52}
+                focus={{ x: 0.5, y: 0.54 }}
+              />
+            ) : (
+              <HermesOwlet
+                ref={owlRef}
+                phase={phase}
+                bridge={useBridge ? bridge : undefined}
+                emotion={emotion === 'auto' ? null : emotion}
+                reducedMotion={reduced || 'auto'}
+                onState={setSnapshot}
+              />
+            )}
           </div>
 
           {showAll ? (
@@ -234,6 +252,9 @@ export function CharacterSimulator(): JSX.Element {
             </button>
             <button type="button" onClick={() => setShowAll((v) => !v)}>
               {showAll ? 'Hide icon sizes' : 'Icon sizes 64–512'}
+            </button>
+            <button type="button" className={world ? 'is-active' : ''} onClick={() => setWorld((v) => !v)}>
+              {world ? 'World on' : 'World off'}
             </button>
           </div>
         </section>

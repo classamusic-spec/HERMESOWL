@@ -23,7 +23,7 @@ import {
   PHASE_TRANSITION_SECONDS,
   type PhaseTarget,
 } from '../state/phaseTargets';
-import { ANCHORS, GOLD_RAMP, LID_TRAVEL } from '../svg/geometry';
+import { ANCHORS, CYAN_RAMP, GOLD_RAMP, LID_TRAVEL } from '../svg/geometry';
 import { DomWriter, rotateAbout, scaleAbout, translate } from './DomWriter';
 import type { RigNodes } from './RigNodes';
 
@@ -39,12 +39,14 @@ export interface RigOptions {
 const PHASE_BLEND_SMOOTHING = Math.pow(0.05, 1 / PHASE_TRANSITION_SECONDS);
 const EXPRESSION_BLEND_SMOOTHING = 1e-4;
 
-/** Speech nudges the head, but never by more than 2 units. */
-const SPEECH_BOB_MAX = 1.5;
+/** Speech nudges the head, in source units. */
+const SPEECH_BOB_MAX = 0.5;
 
-/** Pick a flat gold step for a 0..1 brightness. */
-const goldStep = (brightness: number): string =>
-  GOLD_RAMP[Math.round(clamp01(brightness) * (GOLD_RAMP.length - 1))]!;
+/** Pick a flat colour step for a 0..1 brightness. */
+const rampStep = (ramp: readonly string[], brightness: number): string =>
+  ramp[Math.round(clamp01(brightness) * (ramp.length - 1))]!;
+const goldStep = (brightness: number): string => rampStep(GOLD_RAMP, brightness);
+const cyanStep = (brightness: number): string => rampStep(CYAN_RAMP, brightness);
 
 type BlendKeys =
   | 'headY'
@@ -447,16 +449,12 @@ export class HermesOwletRig {
       'head-root',
       `${translate(0, f.headY)} ` +
         `${rotateAbout(f.headTilt, ANCHORS.headPivot.x, ANCHORS.headPivot.y)} ` +
-        `${scaleAbout(sx, sy, 256, 452)}`,
+        `${scaleAbout(sx, sy, ANCHORS.headPivot.x, ANCHORS.headPivot.y)}`,
     );
 
     // 2.5D: the face rides a fraction of the tilt, so it leads the form it is
     // painted on instead of being welded flat to it.
-    w.transform('face-layer', translate(f.headTilt * 0.6, f.headY * 0.06));
-    w.transform(
-      'crown-tuft',
-      rotateAbout(this.idle.tuftAngle, ANCHORS.tuftPivot.x, ANCHORS.tuftPivot.y),
-    );
+    w.transform('face-layer', translate(f.headTilt * 0.18, f.headY * 0.06));
     w.transform(
       'left-wing',
       rotateAbout(this.wings.left, ANCHORS.leftWingPivot.x, ANCHORS.leftWingPivot.y),
@@ -483,10 +481,13 @@ export class HermesOwletRig {
     w.opacity('halo-bloom', Math.max(0, this.halo.glow - 0.72) * 1.15 * haloOpacity);
 
     const sparkAngle = (this.halo.rotation * Math.PI) / 180;
-    const sparkX = halo.cx + Math.cos(sparkAngle) * 26;
-    const sparkY = halo.cy + Math.sin(sparkAngle) * 8;
+    const sparkX = Math.cos(sparkAngle) * 8;
+    const sparkY = Math.sin(sparkAngle) * 2.4;
     const sparkScale = this.halo.sparkScale * (1 + f.micro.sparkFlash * 0.35);
-    w.transform('halo-spark', `${translate(sparkX, sparkY)} scale(${round(sparkScale, 3)})`);
+    w.transform(
+      'halo-spark',
+      `${translate(sparkX, sparkY)} ${scaleAbout(sparkScale, sparkScale, halo.cx + 4, halo.cy)}`,
+    );
     w.opacity('halo-spark', clamp01(this.halo.sparkOpacity + f.micro.sparkFlash * 0.4) * haloOpacity);
 
     // Forehead star: a slow breath while thinking, a flash on success.
@@ -505,22 +506,26 @@ export class HermesOwletRig {
     w.opacity('forehead-star-bloom', Math.max(0, starLight - 0.7) * 1.8);
 
     // Eyes.
-    const eyeTransform = (x: number, y: number): string =>
-      `${translate(x, y)} scale(${round(f.eyeScaleX, 4)} ${round(f.eyeScaleY, 4)})`;
-    w.transform('left-eye', eyeTransform(ANCHORS.leftEye.x, ANCHORS.leftEye.y));
-    w.transform('right-eye', eyeTransform(ANCHORS.rightEye.x, ANCHORS.rightEye.y));
+    w.transform(
+      'left-eye',
+      scaleAbout(f.eyeScaleX, f.eyeScaleY, ANCHORS.leftEye.x, ANCHORS.leftEye.y),
+    );
+    w.transform(
+      'right-eye',
+      scaleAbout(f.eyeScaleX, f.eyeScaleY, ANCHORS.rightEye.x, ANCHORS.rightEye.y),
+    );
 
     // The eye rolls down a touch under a closing lid, the way a real one does.
-    const pupil = translate(f.gazePx.x, f.gazePx.y + f.blink * 3);
-    w.transform('left-pupil', pupil);
-    w.transform('right-pupil', pupil);
-
-    const core = ANCHORS.eye.coreOffset;
-    const coreScale =
-      `translate(${core.x} ${core.y}) scale(${round(this.blend.pupilScale, 4)}) ` +
-      `translate(${-core.x} ${-core.y})`;
-    w.transform('left-pupil-core', coreScale);
-    w.transform('right-pupil-core', coreScale);
+    const gx = f.gazePx.x;
+    const gy = f.gazePx.y + f.blink * 1;
+    const ps = this.blend.pupilScale;
+    for (const side of ['left', 'right'] as const) {
+      const a = side === 'left' ? ANCHORS.leftEye : ANCHORS.rightEye;
+      w.transform(
+        `${side}-pupil`,
+        `${translate(gx, gy)} ${scaleAbout(ps, ps, a.x, a.y)}`,
+      );
+    }
 
     const upperY = lerp(LID_TRAVEL.upperParked, LID_TRAVEL.upperClosed, f.upperClose);
     const lowerY = lerp(LID_TRAVEL.lowerParked, LID_TRAVEL.lowerClosed, f.lowerClose);
@@ -533,7 +538,7 @@ export class HermesOwletRig {
 
     // Brows stay invisible at neutral so the locked silhouette is untouched.
     const browOpacity = clamp01(this.expression.browOpacity);
-    const browY = ANCHORS.leftEye.y - 60 + this.expression.browY;
+    const browY = ANCHORS.leftEye.y - 19 + this.expression.browY * 0.32;
     w.opacity('left-brow', browOpacity);
     w.opacity('right-brow', browOpacity);
     w.transform(
@@ -546,12 +551,15 @@ export class HermesOwletRig {
     );
 
     // Beak.
+    // Dropping the mandible uncovers the mouth beneath it; the lens shape does
+    // the rest, so speech reads at 64 px rather than only at 512.
     w.transform('lower-beak', translate(0, f.beakDrop));
-    w.attr('beak-gap', 'height', round(2 + f.beakDrop, 2));
 
     // Headphone rings.
-    w.opacity('left-headphone-lit', this.headphones.left);
-    w.opacity('right-headphone-lit', this.headphones.right);
+    // The ear discs step along the cyan ramp rather than fading a bright disc
+    // over the source colour, so idle sits exactly on the approved cyan.
+    w.attr('left-headphone-lit', 'fill', cyanStep(this.headphones.left));
+    w.attr('right-headphone-lit', 'fill', cyanStep(this.headphones.right));
     // The soft ring outside each cup belongs to LISTENING; at rest it is off.
     w.opacity('left-headphone-glow', this.headphones.left * 0.3 * this.fx.listening);
     w.opacity('right-headphone-glow', this.headphones.right * 0.3 * this.fx.listening);
@@ -562,9 +570,9 @@ export class HermesOwletRig {
     w.opacity('error-pulse', this.fx.error * 0.17);
 
     const thinkAngle = (-this.halo.rotation * 1.7 * Math.PI) / 180;
-    const tx = halo.cx + Math.cos(thinkAngle) * (halo.rx + 18);
-    const ty = halo.cy + Math.sin(thinkAngle) * (halo.ry + 16);
-    w.transform('thinking-spark', `${translate(tx, ty)} scale(0.62)`);
+    const tx = Math.cos(thinkAngle) * (halo.rx + 6) - 4;
+    const ty = Math.sin(thinkAngle) * (halo.ry + 5) - 2;
+    w.transform('thinking-spark', translate(tx, ty));
     w.opacity('thinking-spark', this.fx.thinking * 0.9);
   }
 

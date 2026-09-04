@@ -1,254 +1,131 @@
 /**
- * Hermes Owlet — locked vector geometry.
+ * Hermes Owlet — anchors, palette and the few shapes the source art does not
+ * contain.
  *
- * The art direction here is APPROVED AND LOCKED. This module is pure data: it
- * holds every path, anchor and colour the character is drawn from, so the SVG
- * renderer, the animation rig and the static asset exporter all read from one
- * source of truth. Change a number here and every consumer follows.
+ * The character itself lives in `sourceArt.ts`, lifted verbatim from `owl.svg`.
+ * This module works in the source's own coordinate space rather than rescaling
+ * it, so the rendered head is the approved art to the pixel and every number
+ * below can be read straight off the original file.
  *
- * Canvas is a 512x512 square so the head works as an app / tray / status icon
- * as well as a desktop companion. The character occupies roughly y 84..452.
+ * The source is 156 x 144 with content spanning x 1.4..154.7 and y 19.1..126.9.
+ * The view box below is a square window centred on that content, so the head
+ * still works as an app, tray or status icon.
  */
 
-export const VIEW_BOX = { width: 512, height: 512 } as const;
+export const VIEW_BOX = { x: -2, y: -7, width: 160, height: 160 } as const;
 
-/** Flat colour tokens. Do not introduce additional colours without a reason. */
+/**
+ * Colour tokens, sampled from the source art. The character's own shapes carry
+ * their colours inline; these are for the state effects layered over it.
+ */
 export const HERMES_COLORS = {
-  navy: '#17265C',
-  navyDeep: '#101B44',
-  navyLight: '#2E4794',
-  cyan: '#29A9F5',
-  cyanDim: '#2A86C4',
-  cyanBright: '#7BD6FF',
-  cream: '#FDF8EC',
-  gold: '#FBBF45',
-  goldDark: '#E3A32B',
-  goldBright: '#FFDE8C',
+  navy: '#1F3172',
+  navyDeep: '#00113D',
+  navyDeepest: '#001342',
+  cream: '#FFF7EA',
+  creamShade: '#FCF2E3',
   white: '#FFFFFF',
+  cyan: '#00B4FE',
+  cyanBright: '#5FD5FF',
+  cyanDim: '#0B6FA8',
+  gold: '#FFBE37',
+  goldLight: '#FFC74A',
+  goldDark: '#D89019',
+  goldBright: '#FFE08A',
   concern: '#E8836F',
 } as const;
 
 export type HermesColorToken = keyof typeof HERMES_COLORS;
 
 /**
- * Brightness is expressed as a flat colour step, not as a translucent overlay
- * or a filter: a semi-transparent "glow" laid over navy just reads as grey
- * mud, and filters cost GPU time a companion app should not spend. Index 0 is
- * fully dimmed, 5 is the locked gold, 10 is the brightest flash.
+ * Brightness is a flat colour step along this ramp, never a translucent layer
+ * over navy — that only ever reads as grey. Index 0 is fully dimmed, 5 is the
+ * source's locked gold, 10 is the brightest flash.
  */
 export const GOLD_RAMP = [
-  '#E3A32B',
-  '#E8A930',
-  '#EDAE35',
-  '#F1B43B',
-  '#F6B940',
-  '#FBBF45',
-  '#FCC553',
-  '#FDCB61',
-  '#FDD270',
-  '#FED87E',
-  '#FFDE8C',
+  '#D89019',
+  '#E0991F',
+  '#E8A225',
+  '#EFAC2B',
+  '#F7B531',
+  '#FFBE37',
+  '#FFC548',
+  '#FFCC58',
+  '#FFD269',
+  '#FFD979',
+  '#FFE08A',
 ] as const;
 
-/**
- * Premium shading pass.
- *
- * The character stays flat-coloured and outlined — no textures, no rendered
- * lighting. Form comes from three restrained devices: a single subtle radial or
- * linear gradient per major shape, a contact-occlusion band where one layer
- * overhangs another, and one rim light. Every intensity lives here, so the whole
- * pass dials down to nothing by zeroing these numbers.
- *
- * One light, from the upper right. It is already implied by the locked art —
- * the eye highlight sits upper-right and the cyan crescent lower-left — so every
- * shadow added here falls to the lower left to agree with it.
- */
-export const SHADING = {
-  /** Inner occlusion band where the navy head overhangs the cream mask. */
-  faceOcclusion: 0.07,
-  /** Shadow the crest drops onto the skull. */
-  tuftContact: 0.13,
-  /** Shadow the beak drops onto the mask. */
-  beakContact: 0.085,
-  /** Rim light along the upper-right shoulder of the head. */
-  headRim: 0.22,
-  /** Lid shadow across the top of each eye. */
-  eyeLid: 0.085,
-  /** Bounce highlight opposite the specular. */
-  eyeBounce: 0.55,
-  /** Specular arc on the headphone rings. */
-  cupSpecular: 0.38,
-} as const;
+/** The ear discs step along this ramp the same way. Index 5 is the source cyan. */
+export const CYAN_RAMP = [
+  '#0A3A5C',
+  '#08547C',
+  '#066E9D',
+  '#0487BD',
+  '#02A1DE',
+  '#00BBFE',
+  '#20C4FE',
+  '#40CCFF',
+  '#5FD5FF',
+  '#7FDDFF',
+  '#9FE6FF',
+] as const;
 
-/**
- * Two-stop paint ramps. Each is a small value shift around the locked token —
- * enough to give a shape volume, never enough to read as a gradient.
- */
-export const PAINT = {
-  headLit: '#1C2C68',
-  headShade: '#14204F',
-  headRim: '#3D58A6',
-  faceLit: '#FFFDF6',
-  faceShade: '#F6EEDD',
-  creamLit: '#FFFDF6',
-  creamShade: '#F2E8D2',
-  irisTop: '#1B87D4',
-  irisBottom: '#4FBEFF',
-  pupilCore: '#0C1538',
-  pupilBounce: '#22357A',
-  beakLit: '#FFCF63',
-  beakShade: '#E9A930',
-  goldLit: '#FFD570',
-  goldShade: '#E09E22',
-  cyanLit: '#5CC7FF',
-  cyanShade: '#1B8ED4',
-} as const;
-
-/**
- * The halo is drawn as two arcs rather than one ellipse: the far half in a
- * darker gold, the near half in the lit gold. That single split is what makes a
- * flat ellipse read as a ring seen in perspective.
- */
-export const HALO_ARCS = {
-  back: 'M 158 111 A 96 26 0 0 1 350 111',
-  front: 'M 350 111 A 96 26 0 0 1 158 111',
-} as const;
-
-/** Rim-light arc along the head's upper-right shoulder. */
-export const HEAD_RIM_PATH = 'M 296 171 C 344 180 386 212 398 262';
-
-/** Stroke weights, in user units. The heavy navy outline is part of the design. */
+/** Stroke weights, in source units. */
 export const STROKE = {
-  silhouette: 7,
-  detail: 6,
-  fine: 5,
-  halo: 11,
-  brow: 8,
+  detail: 1.25,
+  halo: 3.5998,
+  brow: 2.4,
+  lid: 1.25,
 } as const;
 
-/** Pivots and centres the rig animates around. */
+/** Pivots and centres the rig animates around, all in source coordinates. */
 export const ANCHORS = {
-  /** Head rotates about a point low in the skull so a tilt reads as a neck tilt. */
-  headPivot: { x: 256, y: 402 },
-  tuftPivot: { x: 244, y: 246 },
-  leftWingPivot: { x: 134, y: 356 },
-  rightWingPivot: { x: 378, y: 356 },
-  leftEye: { x: 190, y: 322 },
-  rightEye: { x: 322, y: 322 },
-  leftHeadphone: { x: 86, y: 352 },
-  rightHeadphone: { x: 426, y: 352 },
-  halo: { cx: 254, cy: 111, rx: 96, ry: 26 },
-  foreheadStar: { x: 256, y: 226 },
-  beakSeam: { x: 256, y: 375 },
-  /** Eye geometry. The pupil never reaches the sclera edge. */
+  /** The head tilts about a point low in the skull, so it reads as a neck tilt. */
+  headPivot: { x: 78, y: 126 },
+  leftWingPivot: { x: 33, y: 92 },
+  rightWingPivot: { x: 123, y: 92 },
+  leftEye: { x: 53.95, y: 93.95 },
+  rightEye: { x: 101.8, y: 93.95 },
+  leftHeadphone: { x: 24.7, y: 96.8 },
+  rightHeadphone: { x: 130.4, y: 96.7 },
+  halo: { cx: 76.95, cy: 26.85, rx: 30.75, ry: 7.75 },
+  foreheadStar: { x: 77.6, y: 61.55 },
+  /** Where the beak splits. The widest point of the diamond. */
+  beakSeam: { x: 77.4, y: 104.6 },
+  beak: { left: 71.3, right: 83.5, top: 97.4, bottom: 113.4 },
   eye: {
-    scleraRadius: 48,
-    irisRadius: 40,
-    /** Navy core is offset up-and-right, leaving the cyan crescent lower-left. */
-    coreOffset: { x: 11, y: -13 },
-    highlightOffset: { x: 16, y: -18 },
-    highlightRadius: 8,
-    /** Bounce light, opposite the specular. Reads as a second light source. */
-    bounceOffset: { x: 2, y: 17 },
-    bounceRadius: 4,
-    maxGazeX: 7,
-    maxGazeY: 5,
+    /** Radius of the white of the eye. */
+    scleraRadius: 14.9,
+    /** The pupil never reaches the edge of the white. */
+    maxGazeX: 2.2,
+    maxGazeY: 1.6,
   },
 } as const;
 
 /**
- * How far the lower beak may drop at full amplitude, in user units.
- * ~4% of face-mask height — deliberately conservative: the owl must never
- * read as a puppet.
+ * How far the lower mandible drops at full amplitude, in source units — about a
+ * quarter of the beak's height. Speech has to be legible at 64 px, so this is
+ * deliberately more generous than a "barely moving" reading of the brief, while
+ * still nowhere near a puppet.
  */
-export const BEAK_MAX_DROP = 9;
+export const BEAK_MAX_DROP = 4;
 
-export const PATHS = {
-  crownTuft:
-    'M 162 244 C 160 202 168 172 180 150 C 187 139 200 145 197 158 C 194 174 192 190 191 204 ' +
-    'C 205 174 230 138 250 116 C 261 105 273 113 269 127 C 262 152 253 182 249 202 ' +
-    'C 265 177 289 151 308 143 C 320 138 328 149 320 161 C 305 184 295 213 293 246 Z',
-
-  headBase:
-    'M 256 166 C 340 166 403 222 403 292 C 405 314 406 342 402 362 C 394 420 356 452 292 452 ' +
-    'L 220 452 C 156 452 118 420 110 362 C 106 342 107 314 109 292 C 109 222 172 166 256 166 Z',
-
-  faceMask:
-    'M 256 285 C 250 256 240 228 220 213 C 197 197 165 206 146 229 C 129 249 118 277 117 307 ' +
-    'C 116 333 116 353 118 369 C 123 413 158 443 206 443 L 306 443 C 354 443 389 413 394 369 ' +
-    'C 396 353 396 333 395 307 C 394 277 383 249 366 229 C 347 206 315 197 292 213 ' +
-    'C 272 228 262 256 256 285 Z',
-
-  foreheadStar:
-    'M 256 205 C 256 216 259 221 268 226 C 259 231 256 236 256 247 C 256 236 253 231 244 226 ' +
-    'C 253 221 256 216 256 205 Z',
-
-  haloSpark:
-    'M 0 -13 C 0 -6 2 -3 10 0 C 2 3 0 6 0 13 C 0 6 -2 3 -10 0 C -2 -3 0 -6 0 -13 Z',
-
-  /** Left wing: three overlapping cream feathers, drawn back-to-front. */
-  wingFeathers: [
-    'M 132 338 C 72 297 45 225 42 166 C 89 203 132 265 132 338 Z',
-    'M 126 348 C 65 329 30 275 18 224 C 66 243 115 285 126 348 Z',
-    'M 120 358 C 74 365 39 337 22 304 C 59 301 102 315 120 358 Z',
-  ] as const,
-
-  /** Gold inner feather accents, laid over the cream feathers. */
-  wingAccents: [
-    'M 102 324 C 75 302 63 266 60 238 C 81 258 101 290 102 324 Z',
-    'M 98 348 C 73 338 59 314 54 292 C 73 302 93 322 98 348 Z',
-  ] as const,
-
-  /** Eye sclera, in eye-local coordinates; the outer-top corner is pointed. */
-  scleraLeft:
-    'M -29 -42 C -12 -50 8 -49 23 -40 C 40 -29 48 -12 48 5 C 48 28 27 48 0 48 ' +
-    'C -27 48 -48 28 -48 5 C -48 -13 -41 -32 -29 -42 Z',
-  scleraRight:
-    'M 29 -42 C 12 -50 -8 -49 -23 -40 C -40 -29 -48 -12 -48 5 C -48 28 -27 48 0 48 ' +
-    'C 27 48 48 28 48 5 C 48 -13 41 -32 29 -42 Z',
-
-  /** Lids, in eye-local coordinates. Their leading edge carries the navy line. */
-  upperLid: 'M -74 -104 L 74 -104 L 74 -12 C 46 6 -46 6 -74 -12 Z',
-  lowerLid: 'M -74 104 L 74 104 L 74 12 C 46 -6 -46 -6 -74 12 Z',
-
-  /** Lid shadow across the top of the eye, in eye-local coordinates. */
-  eyeLidShade: 'M -60 -62 L 60 -62 L 60 -44 C 34 -10 -34 -10 -60 -44 Z',
-
-  /** Brow, in eye-local coordinates. Hidden at neutral so the silhouette holds. */
-  brow: 'M -30 0 C -14 -9 14 -9 30 0',
-
-  /**
-   * The beak is one diamond at rest and two halves when it opens, so each half
-   * is drawn as a fill plus an OPEN outline that skips the shared seam. Without
-   * that, a closed navy line would sit across the middle of the beak even when
-   * the owl is silent, which the locked art does not have.
-   */
-  upperBeakFill:
-    'M 256 345 C 259 345 262 346 264 349 L 278 368 C 280 371 279 377 275 377 L 237 377 ' +
-    'C 233 377 232 371 234 368 L 248 349 C 250 346 253 345 256 345 Z',
-  upperBeakEdge:
-    'M 237 376 C 233 376 232 371 234 368 L 248 349 C 250 346 253 345 256 345 ' +
-    'C 259 345 262 346 264 349 L 278 368 C 280 371 279 376 275 376',
-  lowerBeakFill:
-    'M 237 375 L 275 375 C 279 375 280 379 278 382 L 261 402 C 258 405 254 405 251 402 ' +
-    'L 234 382 C 232 379 233 375 237 375 Z',
-  lowerBeakEdge:
-    'M 275 375 C 279 375 280 379 278 382 L 261 402 C 258 405 254 405 251 402 ' +
-    'L 234 382 C 232 379 233 375 237 375',
-} as const;
-
-/** Blink drive. Lids are parked off-eye at 0 and overlap at 1. */
+/** Blink drive. Lids park off the eye at 0 and overlap at 1. */
 export const LID_TRAVEL = {
-  upperParked: -104,
-  upperClosed: 12,
-  lowerParked: 104,
-  lowerClosed: 4,
+  upperParked: -33,
+  upperClosed: 4,
+  lowerParked: 33,
+  lowerClosed: 1.5,
 } as const;
 
-/** Headphone ring radii, outer to inner. */
-export const HEADPHONE = {
-  glowRadius: 45,
-  outerRadius: 35,
-  cyanRadius: 23,
-  innerRadius: 11,
+/**
+ * Shapes the source art does not contain, because it is a single open-eyed
+ * pose. All are in eye-local coordinates.
+ */
+export const RIG_SHAPES = {
+  upperLid: 'M -23 -33 L 23 -33 L 23 -3.8 C 14.5 1.9 -14.5 1.9 -23 -3.8 Z',
+  lowerLid: 'M -23 33 L 23 33 L 23 3.8 C 14.5 -1.9 -14.5 -1.9 -23 3.8 Z',
+  /** Hidden at neutral, so the approved silhouette is untouched. */
+  brow: 'M -9.5 0 C -4.5 -2.9 4.5 -2.9 9.5 0',
 } as const;
