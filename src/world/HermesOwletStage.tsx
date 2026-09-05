@@ -34,6 +34,25 @@ export const HermesOwletStage = forwardRef<HermesOwletHandle, HermesOwletStagePr
     const owlRef = useRef<HermesOwletHandle | null>(null);
     const worldRef = useRef<WorldSceneHandle | null>(null);
     const [phase, setPhase] = useState<HermesOwletPhase>(props.phase ?? 'idle');
+    const [prefersReducedMotion, setPrefersReducedMotion] = useState(
+      () =>
+        owletProps.reducedMotion === 'auto' &&
+        typeof window !== 'undefined' &&
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    );
+
+    useEffect(() => {
+      if (owletProps.reducedMotion !== 'auto' || typeof window.matchMedia !== 'function') {
+        setPrefersReducedMotion(false);
+        return;
+      }
+      const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const onChange = (event: MediaQueryListEvent): void => setPrefersReducedMotion(event.matches);
+      setPrefersReducedMotion(query.matches);
+      query.addEventListener('change', onChange);
+      return () => query.removeEventListener('change', onChange);
+    }, [owletProps.reducedMotion]);
 
     useEffect(() => {
       worldRef.current?.setFocus(focus.x, focus.y);
@@ -56,7 +75,9 @@ export const HermesOwletStage = forwardRef<HermesOwletHandle, HermesOwletStagePr
       };
     }, []);
 
-    const reduced = owletProps.reducedMotion === true;
+    const reduced =
+      owletProps.reducedMotion === true ||
+      (owletProps.reducedMotion === 'auto' && prefersReducedMotion);
 
     return (
       <div

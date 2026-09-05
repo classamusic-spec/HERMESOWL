@@ -23,7 +23,7 @@ const GROUPS = {
   star: [37],
   leftPupil: [38, 39, 40],
   rightPupil: [41, 42, 43],
-  beak: [44, 45, 46, 47, 48, 49],
+  beak: [44, 45, 46, 47, 48, 49, 50],
   leftPhone: [19, 27, 21, 22, 31, 33, 35],
   rightPhone: [20, 28, 23, 24, 32, 34, 36],
 };
@@ -38,9 +38,21 @@ for (const m of svg.matchAll(/\.cls-(\d+)\s*\{([^}]+)\}/g)) {
   styles.set(`cls-${m[1]}`, decl);
 }
 
-const paths = [...svg.matchAll(/<path\s+class="([^"]+)"\s+d="([^"]+)"/g)].map(([, cls, d]) => {
-  const st = styles.get(cls) ?? {};
-  const out = { d };
+const paths = [...svg.matchAll(/<path\b([^>]*)\/?\s*>/g)].map(([, rawAttributes]) => {
+  const attrs = Object.fromEntries(
+    [...rawAttributes.matchAll(/([\w:-]+)="([^"]*)"/g)].map((match) => [match[1], match[2]]),
+  );
+  if (!attrs.d) throw new Error('owl.svg contains a path without a d attribute');
+
+  // Most source paths use a CSS class, while the large face base carries an
+  // inline fill. Parse every path first, then let explicit attributes override
+  // its class so no art silently disappears when the export style changes.
+  const st = { ...(styles.get(attrs.class) ?? {}) };
+  if (attrs.fill) st.fill = attrs.fill;
+  if (attrs.stroke) st.stroke = attrs.stroke;
+  if (attrs['stroke-width']) st['stroke-width'] = attrs['stroke-width'];
+
+  const out = { d: attrs.d };
   if (st.fill && st.fill !== 'none') out.fill = st.fill.toUpperCase();
   if (st.stroke && st.stroke !== 'none') {
     out.stroke = st.stroke.toUpperCase();
@@ -49,7 +61,7 @@ const paths = [...svg.matchAll(/<path\s+class="([^"]+)"\s+d="([^"]+)"/g)].map(([
   return out;
 });
 
-if (paths.length < 50) throw new Error(`expected ~51 paths in owl.svg, found ${paths.length}`);
+if (paths.length !== 51) throw new Error(`expected 51 paths in owl.svg, found ${paths.length}`);
 
 const art = Object.fromEntries(
   Object.entries(GROUPS).map(([name, ids]) => [

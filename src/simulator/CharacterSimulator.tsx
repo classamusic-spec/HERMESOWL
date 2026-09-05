@@ -64,10 +64,12 @@ const SCRIPT: { at: number; label: string; run: (bridge: HermesBridge) => void }
 
 export function CharacterSimulator(): JSX.Element {
   const owlRef = useRef<HermesOwletHandle | null>(null);
+  const scriptTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const bridge = useMemo(() => new HermesBridge(true), []);
 
   const [useBridge, setUseBridge] = useState(false);
   const [phase, setPhase] = useState<HermesOwletPhase>('idle');
+  const [bridgePhase, setBridgePhase] = useState<HermesOwletPhase>(bridge.phase);
   const [emotion, setEmotion] = useState<HermesEmotion | 'auto'>('auto');
   const [size, setSize] = useState<number>(320);
   const [dark, setDark] = useState(true);
@@ -91,6 +93,13 @@ export function CharacterSimulator(): JSX.Element {
     setLog((prev) => [`${new Date().toLocaleTimeString()}  ${line}`, ...prev].slice(0, 14));
   }, []);
 
+  const clearScriptTimers = useCallback(() => {
+    scriptTimersRef.current.forEach(clearTimeout);
+    scriptTimersRef.current = [];
+  }, []);
+
+  useEffect(() => clearScriptTimers, [clearScriptTimers]);
+
   // Frame counter, sampled once a second — never per frame into React.
   useEffect(() => {
     let frames = 0;
@@ -112,7 +121,7 @@ export function CharacterSimulator(): JSX.Element {
   // Synthetic TTS amplitude while speaking.
   useEffect(() => {
     if (!autoSpeech) return;
-    const speakingNow = useBridge ? bridge.phase === 'speaking' : phase === 'speaking';
+    const speakingNow = useBridge ? bridgePhase === 'speaking' : phase === 'speaking';
     if (!speakingNow) {
       owlRef.current?.setSpeechLevel(0);
       return;
@@ -130,7 +139,7 @@ export function CharacterSimulator(): JSX.Element {
       cancelAnimationFrame(raf);
       owlRef.current?.setSpeechLevel(0);
     };
-  }, [autoSpeech, phase, useBridge, bridge]);
+  }, [autoSpeech, bridgePhase, phase, useBridge]);
 
   useEffect(() => {
     if (autoSpeech) return;
@@ -152,23 +161,30 @@ export function CharacterSimulator(): JSX.Element {
 
   useEffect(() => {
     if (!useBridge) return;
-    const off = bridge.onPhase((next) => push(`phase → ${PHASE_LABELS[next]}`));
+    setBridgePhase(bridge.phase);
+    const off = bridge.onPhase((next) => {
+      setBridgePhase(next);
+      push(`phase → ${PHASE_LABELS[next]}`);
+    });
     return off;
   }, [bridge, useBridge, push]);
 
   const runScript = useCallback(() => {
+    clearScriptTimers();
+    bridge.send(hermesEvents.disconnected());
     setUseBridge(true);
     push('script: start');
-    const timers = SCRIPT.map((step) =>
+    scriptTimersRef.current = SCRIPT.map((step) =>
       setTimeout(() => {
         step.run(bridge);
         push(`event ${step.label}`);
       }, step.at),
     );
-    return () => timers.forEach(clearTimeout);
-  }, [bridge, push]);
+  }, [bridge, clearScriptTimers, push]);
 
   const selectPhase = (next: HermesOwletPhase): void => {
+    clearScriptTimers();
+    bridge.send(hermesEvents.disconnected());
     setUseBridge(false);
     setPhase(next);
     push(`phase → ${PHASE_LABELS[next]}`);
@@ -177,9 +193,12 @@ export function CharacterSimulator(): JSX.Element {
   return (
     <div className={`sim ${dark ? 'sim--dark' : 'sim--light'}`}>
       <header className="sim__head">
-        <div>
-          <h1>Hermes Owlet</h1>
-          <p>Animated character head · state simulator</p>
+        <div className="sim__title">
+          <a className="sim__back" href="/" aria-label="Return to Hermes body">←</a>
+          <div>
+            <h1>Hermes Owlet</h1>
+            <p>Animated character head · state simulator</p>
+          </div>
         </div>
         <div className="sim__badge">
           <span className={fps >= 55 ? 'ok' : fps >= 40 ? 'warn' : 'bad'}>{fps} fps</span>

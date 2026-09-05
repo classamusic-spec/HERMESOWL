@@ -233,6 +233,29 @@ export class HermesOwletMachine {
     return this.ctx.activeTool;
   }
 
+  /** Earliest time a clock-only transition can change the visible phase. */
+  nextTickAt(now: number = Date.now()): number | null {
+    const deadlines = [
+      this.ctx.errorActive ? this.ctx.errorUntil : 0,
+      this.ctx.interruptedUntil,
+      this.ctx.wakingUntil,
+      this.ctx.successUntil,
+    ];
+
+    const wanted = resolvePhase(this.ctx, now);
+    const isBlockedDowngrade =
+      wanted !== this.phase &&
+      PHASE_PRIORITY[wanted] <= PHASE_PRIORITY[this.phase] &&
+      now - this.phaseSince < TIMINGS.minDwell;
+    if (isBlockedDowngrade) deadlines.push(this.phaseSince + TIMINGS.minDwell);
+
+    let next = Number.POSITIVE_INFINITY;
+    for (const deadline of deadlines) {
+      if (deadline > now && deadline < next) next = deadline;
+    }
+    return Number.isFinite(next) ? next : null;
+  }
+
   subscribe(listener: PhaseListener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);

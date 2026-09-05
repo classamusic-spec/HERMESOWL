@@ -7,15 +7,28 @@ cyan lower crescent, a gold diamond beak, a four-point forehead star, feather wi
 headphone discs at the sides, and a floating halo. Flat colours, one heavy navy outline,
 no textures, no gradients, no body. It reacts to Hermes agent state in realtime.
 
+Requires Node.js `^20.19.0` or `>=22.12.0`.
+
 ```
 npm install
-npm run dev          # simulator at http://localhost:5178
+npm run dev          # interactive Hermes body at http://127.0.0.1:5178
 npm run build        # typecheck + production bundle
 npm run typecheck
+npm run verify:art   # source-art coverage and semantic grouping regression
+npm run verify:activity
 npm run export:svg   # regenerate ../Art/hermes-owlet/hermes-owlet.svg from the geometry
 ```
 
-The simulator is the whole character exercised without Hermes running: every phase, every
+The default dashboard is the Owlet's interactive body. When launched from Hermes Desktop,
+its local-only activity bridge follows the active conversation: user input becomes listening,
+model work becomes thinking, tool calls become tool use, and completed responses drive speaking
+and success. Only session metadata crosses the bridge — message content, reasoning, tool
+arguments, and tool results are never sent to the browser.
+The bridge fingerprints SQLite's database and WAL files before querying, so an idle body does not
+repeat database reads, and polling slows further while the dashboard is hidden. Read-only SQLite
+access is bundled with the app, so the system `sqlite3` command is not required.
+
+Open **Lab** (or `/?view=simulator`) for the full character simulator without Hermes running: every phase, every
 micro-animation, gaze and glow sliders, a synthetic TTS amplitude source, a scripted Hermes
 event session, a live state readout, an FPS badge, and a 64→512 px icon strip.
 
@@ -64,9 +77,14 @@ src/
     worldTheme.ts                a mood per phase, plus the constellation
   audio/SpeechMeter.ts           TTS amplitude -> 0..1, fast attack / slow release
   bridge/HermesBridge.ts         normalised Hermes events -> phase
+  bridge/useHermesActivity.ts    privacy-minimal local conversation projection
+  dashboard/                     interactive body HUD and signal view
   simulator/CharacterSimulator.tsx
 scripts/
+  hermes-activity-plugin.ts      local-only state.db metadata endpoint
   trace-art.mjs                  owl.svg -> sourceArt.ts
+  verify-art.mjs                 source path/group regression
+  verify-activity.mjs            conversation-to-phase regression
   export-static-svg.tsx          renders the real component to a standalone asset
 ```
 
@@ -133,7 +151,7 @@ approved silhouette is untouched unless an expression asks for them.
 ## The art is the source, not a copy of it
 
 `owl.svg` in this repository is the approved character. Rather than re-draw it,
-`npm run trace:art` lifts all 50 of its paths **verbatim** into
+`npm run trace:art` lifts all 51 of its paths **verbatim** into
 `src/character/svg/sourceArt.ts`, grouped — and only grouped — into the layers
 the rig needs to move. The component renders them in the source's own coordinate
 space (156 x 144, windowed to a square view box), so nothing is rescaled and

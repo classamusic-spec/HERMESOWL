@@ -418,7 +418,9 @@ export class HermesOwletRig {
       this.stateClock += dt;
       if (this.stateClock >= 1 / 12) {
         this.stateClock = 0;
-        this.onState(this.state);
+        // React state setters ignore the same object reference. Emit a real
+        // snapshot at the documented debug cadence instead of the live store.
+        this.onState({ ...this.state });
       }
     }
   }

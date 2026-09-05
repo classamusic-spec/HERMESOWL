@@ -34,6 +34,8 @@ export class SpeechMeter {
   private source: AudioNode | null = null;
   private buffer = new Float32Array(new ArrayBuffer(0));
   private raf = 0;
+  private running = false;
+  private generation = 0;
   private lastTime = 0;
   private ceiling = 0.08;
   private smoothed = 0;
@@ -98,18 +100,24 @@ export class SpeechMeter {
 
   start(listener: (level: number) => void): void {
     this.listener = listener;
-    if (this.raf) return;
+    if (this.running) return;
+    this.running = true;
+    const generation = ++this.generation;
     this.lastTime = performance.now();
     const frame = (now: number): void => {
+      if (!this.running || generation !== this.generation) return;
       const dt = Math.min((now - this.lastTime) / 1000, 0.1);
       this.lastTime = now;
       this.listener?.(this.sample(dt));
+      if (!this.running || generation !== this.generation) return;
       this.raf = requestAnimationFrame(frame);
     };
     this.raf = requestAnimationFrame(frame);
   }
 
   stop(): void {
+    this.running = false;
+    this.generation += 1;
     if (this.raf) cancelAnimationFrame(this.raf);
     this.raf = 0;
     this.listener = null;
@@ -118,6 +126,7 @@ export class SpeechMeter {
 
   async dispose(): Promise<void> {
     this.stop();
+    if (this.source && this.analyser) this.source.disconnect(this.analyser);
     this.analyser?.disconnect();
     this.analyser = null;
     if (this.ownsContext && this.context) await this.context.close();

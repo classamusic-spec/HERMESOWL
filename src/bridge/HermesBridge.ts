@@ -20,7 +20,7 @@ export class HermesBridge {
 
   private phaseHandlers = new Set<PhaseHandler>();
   private speechHandlers = new Set<SpeechHandler>();
-  private timer: ReturnType<typeof setInterval> | null = null;
+  private timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(connected = false) {
     this.machine = new HermesOwletMachine(connected);
@@ -38,12 +38,26 @@ export class HermesBridge {
     if (event.type === 'SPEECH_STOPPED' || event.type === 'INTERRUPTED') {
       for (const handler of this.speechHandlers) handler(0);
     }
-    return this.machine.send(event);
+    try {
+      return this.machine.send(event);
+    } finally {
+      this.scheduleTick();
+    }
   }
 
   onPhase(handler: PhaseHandler): () => void {
     this.phaseHandlers.add(handler);
-    this.ensureTicking();
+    // Catch up if a transient expired while nobody was subscribed.
+    try {
+      this.machine.tick();
+    } catch (error) {
+      // A handler that fails during catch-up never receives an unsubscribe
+      // function, so remove it before propagating the consumer error.
+      this.phaseHandlers.delete(handler);
+      throw error;
+    } finally {
+      this.scheduleTick();
+    }
     return () => {
       this.phaseHandlers.delete(handler);
       this.maybeStopTicking();
@@ -65,7 +79,11 @@ export class HermesBridge {
 
   /** Jump straight to a phase. For the simulator and for tests only. */
   forcePhase(phase: HermesOwletPhase): void {
-    this.machine.forcePhase(phase);
+    try {
+      this.machine.forcePhase(phase);
+    } finally {
+      this.scheduleTick();
+    }
   }
 
   dispose(): void {
@@ -75,18 +93,30 @@ export class HermesBridge {
   }
 
   /**
-   * Transient phases (`waking`, `success`, `interrupted`, `error`) expire on a
-   * clock rather than on an event, so the machine needs a heartbeat. 30 ms is
-   * fine-grained enough for the 180 ms interrupt window and costs nothing.
+   * Transient phases expire on a clock. Schedule only the next relevant
+   * boundary instead of polling forever while the agent is idle or hidden.
    */
-  private ensureTicking(): void {
-    if (this.timer !== null) return;
-    this.timer = setInterval(() => this.machine.tick(), 30);
+  private scheduleTick(): void {
+    if (this.timer !== null) clearTimeout(this.timer);
+    this.timer = null;
+    if (this.phaseHandlers.size === 0) return;
+
+    const now = Date.now();
+    const next = this.machine.nextTickAt(now);
+    if (next === null) return;
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      try {
+        this.machine.tick();
+      } finally {
+        this.scheduleTick();
+      }
+    }, Math.max(0, next - now));
   }
 
   private maybeStopTicking(): void {
     if (this.phaseHandlers.size > 0 || this.timer === null) return;
-    clearInterval(this.timer);
+    clearTimeout(this.timer);
     this.timer = null;
   }
 }

@@ -135,7 +135,7 @@ export class WorldRenderer {
     const next = WORLD_MOODS[phase];
     if (next === this.target) return;
     this.target = next;
-    if (phase === 'success') this.burst = 1;
+    if (phase === 'success' && !this.reducedMotion) this.burst = 1;
   }
 
   setSpeechLevel(level: number): void {
@@ -144,6 +144,12 @@ export class WorldRenderer {
 
   setReducedMotion(value: boolean): void {
     this.reducedMotion = value;
+    if (value) {
+      this.burst = 0;
+      this.ripples.length = 0;
+      this.parallax.x = 0;
+      this.parallax.y = 0;
+    }
   }
 
   /** Pointer position in 0..1, for the parallax. */
@@ -263,13 +269,17 @@ export class WorldRenderer {
   }
 
   private update(dt: number): void {
-    this.time += dt;
+    if (!this.reducedMotion) this.time += dt;
     for (const k of COLOR_KEYS) {
       const want = hexToRgb(this.target[k]);
-      this.colors[k] = lerpRgb(this.colors[k], want, 1 - Math.pow(MOOD_BLEND, dt));
+      this.colors[k] = this.reducedMotion
+        ? want
+        : lerpRgb(this.colors[k], want, 1 - Math.pow(MOOD_BLEND, dt));
     }
     for (const k of NUMBER_KEYS) {
-      this.numbers[k] = damp(this.numbers[k], this.target[k], MOOD_BLEND, dt);
+      this.numbers[k] = this.reducedMotion
+        ? this.target[k]
+        : damp(this.numbers[k], this.target[k], MOOD_BLEND, dt);
     }
 
     const px = this.reducedMotion ? 0 : this.pointer.x;
@@ -284,8 +294,8 @@ export class WorldRenderer {
     const pull = this.numbers.moteAttraction;
     for (const m of this.motes) {
       m.y -= m.drift * speed * dt * 12;
-      m.phase += dt * m.sway;
-      if (pull !== 0) {
+      if (!this.reducedMotion) m.phase += dt * m.sway;
+      if (!this.reducedMotion && pull !== 0) {
         m.x += (this.focus.x - m.x) * pull * 0.06 * dt;
         m.y += (this.focus.y - m.y) * pull * 0.06 * dt;
       }
@@ -307,7 +317,7 @@ export class WorldRenderer {
         if (this.ripples.length > 6) this.ripples.shift();
       }
     }
-    for (let i = this.ripples.length - 1; i >= 0; i--) {
+    for (let i = this.ripples.length - 1; i >= 0 && !this.reducedMotion; i--) {
       const r = this.ripples[i]!;
       r.t += dt / 2.2;
       if (r.t >= 1) this.ripples.splice(i, 1);
