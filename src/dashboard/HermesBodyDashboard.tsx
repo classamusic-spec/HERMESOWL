@@ -8,6 +8,7 @@ import {
   type HermesOwletPhase,
   type HermesOwletState,
 } from '../character/state/HermesOwletState';
+import { deriveAdaptivePresence } from '../character/state/adaptivePresence';
 import { useHermesActivity } from '../bridge/useHermesActivity';
 import { HermesOwletStage } from '../world/HermesOwletStage';
 import './hermes-body.css';
@@ -27,7 +28,7 @@ const PHASES: HermesOwletPhase[] = [
   'error',
 ];
 
-const EMOTIONS: EmotionChoice[] = ['auto', 'neutral', 'happy', 'curious', 'focused', 'concerned'];
+const EMOTIONS: EmotionChoice[] = ['auto', 'neutral', 'happy', 'curious', 'focused', 'excited', 'concerned'];
 
 const PHASE_META: Record<HermesOwletPhase, { eyebrow: string; message: string; glyph: string }> = {
   offline: { eyebrow: 'Presence suspended', message: 'Waiting for a Hermes session', glyph: '○' },
@@ -87,6 +88,8 @@ export function HermesBodyDashboard(): JSX.Element {
   const liveConnected = liveMode && linkState === 'live' && activity.connected;
   const phase = liveMode ? (activity.connected ? activity.phase : 'offline') : manualPhase;
   const meta = PHASE_META[phase];
+  const adaptivePresence = deriveAdaptivePresence(phase);
+  const activeEmotion = emotion === 'auto' ? adaptivePresence.emotion : emotion;
   const currentTool = phase === 'tool_use' ? formatTool(activity.toolName) : 'Standing by';
 
   const sessionLabel = useMemo(() => {
@@ -176,7 +179,7 @@ export function HermesBodyDashboard(): JSX.Element {
   };
 
   return (
-    <div className={`body-shell ${dark ? 'body-shell--dark' : 'body-shell--light'}`}>
+    <div className={`body-shell ${dark ? 'body-shell--dark' : 'body-shell--light'} body-shell--mood-${adaptivePresence.mood}`}>
       <header className="body-topbar">
         <div className="body-brand" aria-label="XAVI Hermes Owlet">
           <span className="body-brand__sigil">✦</span>
@@ -249,9 +252,15 @@ export function HermesBodyDashboard(): JSX.Element {
                     <span className="eyebrow">{meta.eyebrow}</span>
                     <h1 id="presence-title">{meta.message}</h1>
                   </div>
-                  <div className={`phase-chip phase-chip--${phase}`} aria-live="polite">
-                    <span>{meta.glyph}</span>
-                    {PHASE_LABELS[phase]}
+                  <div className="presence-card__status" aria-live="polite">
+                    <div className={`mood-chip mood-chip--${adaptivePresence.mood}`} title={adaptivePresence.cue}>
+                      <i aria-hidden="true" />
+                      {adaptivePresence.label}
+                    </div>
+                    <div className={`phase-chip phase-chip--${phase}`}>
+                      <span>{meta.glyph}</span>
+                      {PHASE_LABELS[phase]}
+                    </div>
                   </div>
                 </div>
 
@@ -264,7 +273,7 @@ export function HermesBodyDashboard(): JSX.Element {
                     <HermesOwletStage
                       ref={owlRef}
                       phase={phase}
-                      emotion={emotion === 'auto' ? null : emotion}
+                      emotion={activeEmotion}
                       reducedMotion={reducedMotion || 'auto'}
                       onState={setSnapshot}
                       scale={0.72}
@@ -275,7 +284,7 @@ export function HermesBodyDashboard(): JSX.Element {
                       <HermesOwlet
                         ref={owlRef}
                         phase={phase}
-                        emotion={emotion === 'auto' ? null : emotion}
+                        emotion={activeEmotion}
                         reducedMotion={reducedMotion || 'auto'}
                         onState={setSnapshot}
                       />
@@ -283,8 +292,8 @@ export function HermesBodyDashboard(): JSX.Element {
                   )}
                   <div className="presence-reticle" aria-hidden="true"><span /><span /><span /><span /></div>
                   <div className="presence-caption">
-                    <span>{phase === 'tool_use' ? 'ACTIVE CHANNEL' : 'CURRENT SIGNAL'}</span>
-                    <strong>{phase === 'tool_use' ? currentTool : PHASE_LABELS[phase]}</strong>
+                    <span>{phase === 'tool_use' ? 'ACTIVE CHANNEL' : 'EMOTIONAL SIGNAL'}</span>
+                    <strong>{phase === 'tool_use' ? currentTool : adaptivePresence.label}</strong>
                   </div>
                 </div>
 
@@ -330,7 +339,7 @@ export function HermesBodyDashboard(): JSX.Element {
                     <div><small>MESSAGES</small><strong>{activity.messageCount}</strong></div>
                     <div><small>TOOLS</small><strong>{activity.toolCallCount}</strong></div>
                     <div><small>VOICE</small><strong>{Math.round((snapshot?.speechLevel ?? 0) * 100)}%</strong></div>
-                    <div><small>FOCUS</small><strong>{phase === 'idle' ? 'CALM' : 'ACTIVE'}</strong></div>
+                    <div><small>MOOD</small><strong>{adaptivePresence.label.toUpperCase()}</strong></div>
                   </div>
                 </section>
 
@@ -387,7 +396,7 @@ export function HermesBodyDashboard(): JSX.Element {
               </section>
 
               <section className="hud-card signal-card">
-                <div className="hud-card__heading"><span className="eyebrow">Expression layer</span><span>{emotion}</span></div>
+                <div className="hud-card__heading"><span className="eyebrow">Expression layer</span><span>{emotion === 'auto' ? `auto · ${adaptivePresence.label}` : emotion}</span></div>
                 <div className="emotion-deck">
                   {EMOTIONS.map((item) => (
                     <button

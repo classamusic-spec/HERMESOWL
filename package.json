@@ -15,7 +15,8 @@
     "export:svg": "esbuild scripts/export-static-svg.tsx --bundle --platform=node --format=cjs --outfile=node_modules/.cache/hermes-owlet-export.cjs --log-level=warning && node node_modules/.cache/hermes-owlet-export.cjs",
     "trace:art": "node scripts/trace-art.mjs",
     "verify:art": "node scripts/verify-art.mjs",
-    "verify:activity": "node scripts/verify-activity.mjs"
+    "verify:activity": "node scripts/verify-activity.mjs",
+    "verify:presence": "node scripts/verify-presence.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",

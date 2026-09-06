@@ -37,6 +37,7 @@ export const EXPRESSIONS: Record<HermesEmotion | 'surprised', ExpressionPose> = 
   happy: { ...base, eyeCurve: 1, lidNarrow: 0.16, browOpacity: 0.5, browAngle: -4, browY: -3 },
   curious: { ...base, eyeScaleY: 1.03, browOpacity: 0.55, browAngle: 7, browY: -4 },
   focused: { ...base, lidNarrow: 0.14, eyeScaleY: 0.97, browOpacity: 0.8, browAngle: -6, browY: 2 },
+  excited: { ...base, eyeScaleY: 1.07, eyeCurve: 0.72, browOpacity: 0.7, browAngle: -2, browY: -6 },
   surprised: { ...base, eyeScaleY: 1.06, browOpacity: 0.6, browAngle: 2, browY: -7 },
   concerned: {
     ...base,

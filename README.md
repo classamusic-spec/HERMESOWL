@@ -16,6 +16,7 @@ npm run build        # typecheck + production bundle
 npm run typecheck
 npm run verify:art   # source-art coverage and semantic grouping regression
 npm run verify:activity
+npm run verify:presence # adaptive mood/expression mapping regression
 npm run export:svg   # regenerate ../Art/hermes-owlet/hermes-owlet.svg from the geometry
 ```
 
@@ -24,6 +25,10 @@ its local-only activity bridge follows the active conversation: user input becom
 model work becomes thinking, tool calls become tool use, and completed responses drive speaking
 and success. Only session metadata crosses the bridge — message content, reasoning, tool
 arguments, and tool results are never sent to the browser.
+The adaptive presence layer makes each phase readable at a glance: calm at rest,
+curious while listening, focused while reasoning, warm while speaking, excited on
+success, and concerned during recovery. The Owlet's face, HUD accent, and world mood
+shift together without inspecting conversation content.
 The bridge fingerprints SQLite's database and WAL files before querying, so an idle body does not
 repeat database reads, and polling slows further while the dashboard is hidden. Read-only SQLite
 access is bundled with the app, so the system `sqlite3` command is not required.

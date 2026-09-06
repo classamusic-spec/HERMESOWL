@@ -16,7 +16,13 @@ export type HermesOwletPhase =
   | 'interrupted'
   | 'error';
 
-export type HermesEmotion = 'neutral' | 'happy' | 'curious' | 'focused' | 'concerned';
+export type HermesEmotion =
+  | 'neutral'
+  | 'happy'
+  | 'curious'
+  | 'focused'
+  | 'excited'
+  | 'concerned';
 
 /**
  * Composable secondary values. The phase says what Hermes is doing; these say

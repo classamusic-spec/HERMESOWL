@@ -132,7 +132,7 @@ export const PHASE_TARGETS: Record<HermesOwletPhase, PhaseTarget> = {
     pulsePeriod: 1.4,
     haloGlow: 0.7,
     starGlow: 0.55,
-    emotion: 'neutral',
+    emotion: 'happy',
   },
 
   success: {
@@ -145,7 +145,7 @@ export const PHASE_TARGETS: Record<HermesOwletPhase, PhaseTarget> = {
     pulsePeriod: 1.2,
     haloGlow: 1,
     starGlow: 1,
-    emotion: 'happy',
+    emotion: 'excited',
   },
 
   interrupted: {
